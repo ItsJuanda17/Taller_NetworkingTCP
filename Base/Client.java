@@ -4,29 +4,33 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
-public class ClientTCP {
+public class Client {
     public static void main(String[] args) {
         try {
-            // Conectar al servidor en la IP 192.168.137.1, puerto 12345
-            Socket server = new Socket("172.30.175.156", 12345);
-            System.out.println("Connected to server on IP 192.168.137.1 and port 4321");
+            // Conectar al servidor en el localhost, se puede reemplazar por 127.0.0.1, puerto 12345 <- Este está definido en el server
+            Socket server = new Socket("localhost", 12345);
+            System.out.println("Connected to server on IP localhost and port 12345");
 
             // Preparar el canal de entrada/salida
             BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
             BufferedReader input = new BufferedReader(new InputStreamReader(server.getInputStream()));
             PrintWriter output = new PrintWriter(server.getOutputStream(), true);
 
-            String ms;
+            String username, msg;
+            System.out.println("Insert username:");
+            username = console.readLine();
+            output.println(username);
+
             while (true) {
                 System.out.print("Enter a message to send to the server: ");
-                ms = console.readLine();
+                msg = console.readLine();
 
-                if (ms.equals("exit")) {
+                if (msg.equals("exit")) {
                     break;
                 }
 
                 // Enviar mensaje al servidor
-                output.println(ms);
+                output.println(msg);
 
                 // Leer respuesta del servidor
                 System.out.println("Server says: " + input.readLine());
