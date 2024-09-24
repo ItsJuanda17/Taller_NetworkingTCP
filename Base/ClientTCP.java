@@ -4,7 +4,19 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
-public class ClientTCP {
+public class ClientTCP extends Person {
+
+    private String userName;
+    private Socket socket;
+    private PrintWriter out;    
+
+    public ClientTCP(String userName, Socket socket) throws IOException {
+        super(userName, socket);
+        this.userName = userName;
+        this.socket = socket;
+        this.out = new PrintWriter(socket.getOutputStream(), true); // Auto-flush enabled
+    }
+
     public static void main(String[] args) {
         try {
             // Conectar al servidor en la IP 192.168.137.1, puerto 12345

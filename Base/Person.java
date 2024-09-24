@@ -2,7 +2,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.io.IOException;
 
-public class Person {
+public abstract class Person {
 
     private String userName;
     private Socket socket;
