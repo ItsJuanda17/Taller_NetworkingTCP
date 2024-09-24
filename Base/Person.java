@@ -4,9 +4,9 @@ import java.io.IOException;
 
 public abstract class Person {
 
-    private String userName;
-    private Socket socket;
-    private PrintWriter out;
+    public String userName;
+    public Socket socket;
+    public PrintWriter out;
 
     public Person(String userName, Socket socket) throws IOException {
         this.userName = userName;
