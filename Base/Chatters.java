@@ -2,8 +2,10 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
+
 public class Chatters {
   private Map<String, PrintWriter> users;
+  
 
   public Chatters() {
     users = new HashMap<>();
@@ -22,5 +24,20 @@ public class Chatters {
       writer.println(msg);
     }
   }
-   
+
+  public void privateMessage(String from, String to, String msg) {
+    PrintWriter recipientWriter = users.get(to);
+    
+    if (recipientWriter != null) {
+        recipientWriter.println("Private message from " + from + ": " + msg);
+    } else {
+        // Si no se encuentra el destinatario, enviar un mensaje de error de vuelta al remitente
+        PrintWriter senderWriter = users.get(from);
+        if (senderWriter != null) {
+            senderWriter.println("Error: User " + to + " not found.");
+        }
+    }
+}
+
+
 }

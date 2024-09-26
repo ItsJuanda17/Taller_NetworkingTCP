@@ -26,7 +26,8 @@ public abstract class Person {
     public void sendMessage(String message) {
         out.println(this.userName + ": " + message);
     }
-    
+
+
     public void closeConnection() throws IOException {
         out.close();
         socket.close();
