@@ -9,10 +9,9 @@ public class Server {
     public static void main(String[] args) throws IOException {
 
         Chatters chatters = new Chatters();
-        ServerSocket serverSocket = new ServerSocket(PORT);
 
-        System.out.println("Server started on port: " + PORT);
-        try {
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+            System.out.println("Server started on port: " + PORT);
             while (true) {
                 Socket client = serverSocket.accept();
                 System.out.println("Cliente conectado desde " + client.getInetAddress());
@@ -21,8 +20,6 @@ public class Server {
                 Thread thread = new Thread(handler);
                 thread.start();
             }
-        } finally {
-            serverSocket.close();
         }
     }
 }

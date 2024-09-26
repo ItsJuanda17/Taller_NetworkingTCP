@@ -1,7 +1,5 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import javax.sound.sampled.*;
+import java.io.*;
 import java.net.Socket;
 
 public class Client extends Person {
@@ -30,21 +28,28 @@ public class Client extends Person {
             output.println(username);
 
             // Crear un hilo separado para escuchar mensajes del servidor
-            Thread listenThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        String serverMessage;
-                        while (isRunning && (serverMessage = input.readLine()) != null) {
-                            System.out.println("\nServer says: " + serverMessage);
-                            printMenu();
+            Thread listenThread = new Thread(() -> {
+                try {
+                    String serverMessage;
+                    while (isRunning && (serverMessage = input.readLine()) != null) {
+                        System.out.println(serverMessage);
+                        if (serverMessage.startsWith("VOICE")) {
+                            String[] parts = serverMessage.split(" ", 3);
+                            if (parts.length == 3) {
+                                String sender = parts[1];
+                                if (sender.equals(username)) {
+                                    continue; // No reproducir el audio grabado por el mismo usuario
+                                }
+                                String audioFilePath = parts[2];
+                                playAudio(audioFilePath);
+                            }
                         }
-                    } catch (IOException e) {
-                        if (isRunning) {
-                            System.out.println("Connection closed unexpectedly.");
-                        } else {
-                            System.out.println("Connection closed.");
-                        }
+                    }
+                } catch (IOException e) {
+                    if (isRunning) {
+                        System.out.println("Connection closed unexpectedly.");
+                    } else {
+                        System.out.println("Connection closed.");
                     }
                 }
             });
@@ -53,34 +58,40 @@ public class Client extends Person {
             // Mientras tanto, en el hilo principal se maneja la entrada del usuario
             String choice, msg;
 
+            label:
             while (true) {
                 printMenu();
                 choice = console.readLine();
 
-                if (choice.equals("1")) {
-                    System.out.println("Enter a message to send to the group: ");
-                    msg = console.readLine();
-                    output.println("MESSAGE " + msg);
-
-                } else if (choice.equals("2")) {
-                    System.out.println("Enter the username of the person you want to send the message to: ");
-                    String to = console.readLine();
-                    System.out.println("Enter the message: ");
-                    msg = console.readLine();
-                    output.println("PRIVATE " + to + " " + msg);
-
-                } else if (choice.equals("3")) {
-                    System.out.println("Exiting chat ...");
-                    output.println("EXIT");
-                    isRunning = false; // Detener el hilo de escucha
-                    break;
-
-                } else {
-                    System.out.println("Invalid option. Try again.");
+                switch (choice) {
+                    case "1":
+                        System.out.println("Enter a message to send to the group: ");
+                        msg = console.readLine();
+                        output.println(msg);
+                        break;
+                    case "2":
+                        System.out.println("Enter the username of the person you want to send the message to: ");
+                        String to = console.readLine();
+                        System.out.println("Enter the message: ");
+                        msg = console.readLine();
+                        output.println("PRIVATE " + to + " " + msg);
+                        break;
+                    case "3":
+                        String audioFilePath = recordAudio();
+                        output.println("VOICE " + username + " " + audioFilePath);
+                        break;
+                    case "4":
+                        System.out.println("Exiting chat ...");
+                        output.println("EXIT");
+                        isRunning = false; // Detener el hilo de escucha
+                        break label;
+                    default:
+                        System.out.println("Invalid option. Try again.");
+                        break;
                 }
             }
 
-           
+
             console.close();
             input.close();
             output.close();
@@ -94,12 +105,62 @@ public class Client extends Person {
         }
     }
 
+    private static void playAudio(String audioFilePath) {
+        try {
+            File audioFile = new File(audioFilePath);
+            AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(audioFile);
+            Clip clip = AudioSystem.getClip();
+            clip.open(audioInputStream);
+            clip.start();
+            System.out.println("Playing audio: " + audioFilePath);
+            clip.addLineListener(event -> {
+                if (event.getType() == LineEvent.Type.STOP) {
+                    clip.close();
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String recordAudio() {
+        String audioFilePath = "voiceMessage.wav"; // Nombre del archivo de audio
+        AudioFormat format = new AudioFormat(44100, 16, 1, true, true);
+        try (TargetDataLine line = AudioSystem.getTargetDataLine(format)) {
+            line.open(format);
+            line.start();
+            System.out.println("Recording... Press ENTER to stop.");
+            try (AudioInputStream audioInputStream = new AudioInputStream(line)) {
+                Thread recordingThread = new Thread(() -> {
+                    try {
+                        AudioSystem.write(audioInputStream, AudioFileFormat.Type.WAVE, new File(audioFilePath));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+                recordingThread.start();
+                System.in.read(); // Esperar a que se presione ENTER
+                System.in.read();
+                line.stop();
+                line.close();
+                recordingThread.join(); // Esperar a que termine la grabación
+            }
+            System.out.println("Recording saved as " + audioFilePath);
+        } catch (LineUnavailableException | IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return audioFilePath;
+    }
+
+
     // Método para imprimir el menú
     private static void printMenu() {
-        System.out.println("\nMenu: ");
-        System.out.println("1. Send message");
-        System.out.println("2. Send a private message");
-        System.out.println("3. Exit");
-        System.out.print("Choose an option: ");
+        System.out.println("""
+                Choose an option:
+                1. Send message
+                2. Send a private message
+                3. Record a voice message
+                4. Exit
+                """);
     }
 }

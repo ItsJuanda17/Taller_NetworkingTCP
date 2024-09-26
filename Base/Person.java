@@ -22,7 +22,7 @@ public abstract class Person {
         this.userName = userName;
     }
 
-   
+
     public void sendMessage(String message) {
         out.println(this.userName + ": " + message);
     }
