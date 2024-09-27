@@ -27,6 +27,7 @@ public class Client extends Person {
             username = console.readLine();
             output.println(username);
 
+         
             // Crear un hilo separado para escuchar mensajes del servidor
             Thread listenThread = new Thread(() -> {
                 try {
@@ -81,6 +82,22 @@ public class Client extends Person {
                         output.println("VOICE " + username + " " + audioFilePath);
                         break;
                     case "4":
+                        System.out.println("Enter room name to create: ");
+                        String roomName = console.readLine();
+                        output.println("CREATE_ROOM " + roomName);
+                        break;
+                    case "5":
+                        output.println("LIST_ROOMS");
+                        System.out.println("Enter room name to join: ");
+                        roomName = console.readLine();
+                        output.println("JOIN_ROOM " + roomName);
+                        break;
+                    case "6":
+                        System.out.println("Enter message to send to room: ");
+                        msg = console.readLine();
+                        output.println("ROOM_MSG " + msg);
+                        break;
+                    case "7":
                         System.out.println("Exiting chat ...");
                         output.println("EXIT");
                         isRunning = false; // Detener el hilo de escucha
@@ -91,14 +108,15 @@ public class Client extends Person {
                 }
             }
 
-
+            // Esperar a que el hilo de escucha termine
+            listenThread.join();
+            // Cerrar recursos
             console.close();
             input.close();
             output.close();
             server.close();
 
-            // Esperar a que el hilo de escucha termine
-            listenThread.join();
+            
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -152,7 +170,6 @@ public class Client extends Person {
         return audioFilePath;
     }
 
-
     // Método para imprimir el menú
     private static void printMenu() {
         System.out.println("""
@@ -160,7 +177,10 @@ public class Client extends Person {
                 1. Send message
                 2. Send a private message
                 3. Record a voice message
-                4. Exit
+                4. Create a chat room
+                5. Join a chat room
+                6. Send message to room
+                7. Exit
                 """);
     }
 }

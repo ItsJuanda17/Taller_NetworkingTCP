@@ -8,6 +8,7 @@ public class ClientHandler implements Runnable {
     private final Socket client;
     private final Chatters chatters;
     private String username;
+    private String currentRoom;
 
     public ClientHandler(Socket client, Chatters chatters) {
         this.client = client;
@@ -51,7 +52,42 @@ public class ClientHandler implements Runnable {
                         String audioFilePath = voiceData[2];
                         chatters.sendVoiceMessage(username, audioFilePath);
                     }
-                } else {
+                }else if(msg.startsWith("CREATE_ROOM")) {
+                    String[] splitMsg = msg.split(" ", 2);
+                    if (splitMsg.length == 2) {
+                        String roomName = splitMsg[1].trim();
+                        chatters.createRoom(roomName);
+                    } else {
+                        writer.println("Error: Formato de creación de sala incorrecto.");
+                    }
+                } else if (msg.startsWith("JOIN_ROOM")) {
+                    String[] splitMsg = msg.split(" ", 2);
+                    if (splitMsg.length == 2) {
+                        String roomName = splitMsg[1].trim();
+                        if (chatters.roomExists(roomName)) {
+                            chatters.addUserToRoom(roomName, username);
+                            currentRoom = roomName;
+                            writer.println("Joined room: " + roomName);
+                        }else{
+                            writer.println("Error: Room " + roomName + "does not exist. ");
+
+                        }
+                    }
+                }else if(msg.startsWith("LIST_ROOMS")){
+                    writer.println("Rooms available:  " + chatters.getRooms());  
+                    }else if (msg.startsWith("ROOM_MSG")){
+
+                    if (currentRoom != null) {
+                        String[] splitMsg = msg.split(" ", 2);
+                        if (splitMsg.length == 2) {
+                            String content = splitMsg[1];
+                            chatters.broadcastToRoom(currentRoom, username + ": " + content);
+                        }
+                        
+                    }else{
+                        writer.println("Error: You are not in any room.");
+                    }
+                }else {
                     // Si no es un mensaje privado, lo enviamos al grupo
                     chatters.broadCastMessage(username + ": " + msg);
                 }
