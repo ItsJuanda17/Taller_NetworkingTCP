@@ -94,11 +94,11 @@ public class Chatters {
         return chatHistories.get(roomName);
     }
 
-     // Enviar nota de voz a una sala
-     public void sendVoiceMessageToRoom(String roomName, String from, String audioFilePath) {
+    // Enviar nota de voz a una sala
+    public void sendVoiceMessageToRoom(String roomName, String from, String voiceData) {
         Map<String, PrintWriter> room = chatRooms.get(roomName);
         if (room != null) {
-            String voiceMessage = "VOICE_ROOM " + roomName + " " + from + " " + audioFilePath;
+            String voiceMessage = "VOICE_ROOM " + roomName + " " + from + " " + voiceData;
             chatHistories.get(roomName).add(voiceMessage); // Guardar nota de voz en el historial
             for (PrintWriter writer : room.values()) {
                 writer.println(voiceMessage);

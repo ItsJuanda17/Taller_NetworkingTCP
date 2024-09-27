@@ -41,16 +41,15 @@ public class ClientHandler implements Runnable {
                     chatters.removeUser(username);
                     break;
                 } else if (splitMsg[0].equals("VOICE")) {
-                    String audioFilePath = splitMsg[2];
-                    chatters.sendVoiceMessage(username, audioFilePath);
+                    String voiceData = splitMsg[1];
+                    chatters.broadCastMessage("VOICE " + username + " " + voiceData);
                 } else if (splitMsg[0].equals("VOICE_ROOM")) {
                     String[] voiceData = msg.split(" ", 4);
-                    String audioFilePath = voiceData[3];
+                    String voiceByteData = voiceData[3];
                     if (currentRoom != null) {
-                        chatters.sendVoiceMessageToRoom(currentRoom, username, audioFilePath); // Enviar voz a sala
+                        chatters.sendVoiceMessageToRoom(currentRoom, username, voiceByteData); // Enviar voz a sala
                     }
-                }
-                if (splitMsg[0].equals("CREATE_ROOM")) {
+                } else if (splitMsg[0].equals("CREATE_ROOM")) {
                     String roomName = splitMsg[1].trim();
                     chatters.createRoom(roomName, username); // Crear y unirse automáticamente
                     currentRoom = roomName;

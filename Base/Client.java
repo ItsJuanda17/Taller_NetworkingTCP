@@ -1,6 +1,8 @@
 import javax.sound.sampled.*;
 import java.io.*;
 import java.net.Socket;
+import java.util.Base64;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Client extends Person {
 
@@ -33,17 +35,21 @@ public class Client extends Person {
                 try {
                     String serverMessage;
                     while (isRunning && (serverMessage = input.readLine()) != null) {
-                        System.out.println(serverMessage);
                         String[] parts = serverMessage.split(" ", 4);
+                        boolean isVoiceMessage = parts[0].startsWith("VOICE") || parts[0].startsWith("Voice")
+                                || parts[0].startsWith("VOICE_ROOM");
+                        if (!isVoiceMessage) {
+                            System.out.println(serverMessage);
+                        }
                         if (parts.length == 3) {
-                            System.out.println("parts[0]: " + parts[0]);
                             if (parts[0].equals("VOICE")) {
                                 String sender = parts[1];
                                 if (sender.equals(username)) {
                                     continue;
                                 }
-                                String audioFilePath = parts[2];
-                                playAudio(audioFilePath);
+                                System.out.println("Voice message from: " + parts[1]);
+                                String voiceData = parts[2];
+                                playVoiceData(voiceData);
                             } else if (parts[0].equals("Joined room:")) {
                                 currentRoom = parts[1].trim();
                                 System.out.println("You are now in room: " + currentRoom);
@@ -58,10 +64,13 @@ public class Client extends Person {
                                     continue;
                                 }
                                 if (currentRoom.equals(parts[1])) {
-                                    String audioFilePath = parts[3];
-                                    playAudio(audioFilePath);
+                                    System.out.println("Voice message from: " + parts[2]);
+                                    String voiceData = parts[3];
+                                    playVoiceData(voiceData);
                                 }
                             }
+                        } else {
+                            System.out.println(serverMessage);
                         }
                     }
                 } catch (IOException e) {
@@ -95,8 +104,7 @@ public class Client extends Person {
                         output.println("PRIVATE " + to + " " + msg);
                         break;
                     case "3":
-                        String audioFilePath = recordAudio();
-                        output.println("VOICE " + username + " " + audioFilePath);
+                        recordAndSendAudio(output, username, false);
                         break;
                     case "4":
                         System.out.println("Enter room name to create: ");
@@ -122,8 +130,8 @@ public class Client extends Person {
                         break;
                     case "7":
                         if (currentRoom != null) {
-                            audioFilePath = recordAudio();
-                            output.println("VOICE_ROOM " + currentRoom + " " + username + " " + audioFilePath);
+                            recordAndSendAudio(output, username, true);
+                            System.in.read();
                         } else {
                             System.out.println("Error: You are not in any room.");
                         }
@@ -159,14 +167,17 @@ public class Client extends Person {
         }
     }
 
-    private static void playAudio(String audioFilePath) {
+    private static void playVoiceData(String base64Data) {
         try {
-            File audioFile = new File(audioFilePath);
-            AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(audioFile);
+            byte[] audioBytes = Base64.getDecoder().decode(base64Data);
+            InputStream byteArrayInputStream = new ByteArrayInputStream(audioBytes);
+            AudioFormat format = new AudioFormat(44100, 16, 1, true, true);
+            AudioInputStream audioInputStream = new AudioInputStream(byteArrayInputStream, format,
+                    audioBytes.length / format.getFrameSize());
+
             Clip clip = AudioSystem.getClip();
             clip.open(audioInputStream);
             clip.start();
-            System.out.println("Playing audio: " + audioFilePath);
             clip.addLineListener(event -> {
                 if (event.getType() == LineEvent.Type.STOP) {
                     clip.close();
@@ -177,33 +188,59 @@ public class Client extends Person {
         }
     }
 
-    private static String recordAudio() {
-        String audioFilePath = "voiceMessage.wav"; // Nombre del archivo de audio
+    private static void recordAndSendAudio(PrintWriter output, String username, boolean security) {
+        boolean room_message = security;
         AudioFormat format = new AudioFormat(44100, 16, 1, true, true);
+        AtomicBoolean recording = new AtomicBoolean(true); // Bandera para controlar la grabación
+
         try (TargetDataLine line = AudioSystem.getTargetDataLine(format)) {
             line.open(format);
             line.start();
             System.out.println("Recording... Press ENTER to stop.");
-            try (AudioInputStream audioInputStream = new AudioInputStream(line)) {
-                Thread recordingThread = new Thread(() -> {
-                    try {
-                        AudioSystem.write(audioInputStream, AudioFileFormat.Type.WAVE, new File(audioFilePath));
-                    } catch (IOException e) {
-                        e.printStackTrace();
+
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+            // Hilo para grabar el audio
+            Thread recordingThread = new Thread(() -> {
+                try (AudioInputStream audioInputStream = new AudioInputStream(line)) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while (recording.get() && (bytesRead = audioInputStream.read(buffer)) != -1) {
+                        byteArrayOutputStream.write(buffer, 0, bytesRead);
                     }
-                });
-                recordingThread.start();
-                System.in.read(); // Esperar a que se presione ENTER
-                System.in.read();
-                line.stop();
-                line.close();
-                recordingThread.join(); // Esperar a que termine la grabación
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            recordingThread.start();
+
+            // Esperar a que el usuario presione ENTER
+            System.in.read(); // Espera ENTER para detener la grabación
+
+            // Detener la grabación
+            recording.set(false); // Cambiar el estado de la bandera
+            line.stop();
+            line.close();
+            recordingThread.join();
+
+            // Convertir los datos grabados a un array de bytes
+            byte[] audioData = byteArrayOutputStream.toByteArray();
+
+            // Codificar los datos en Base64 y enviarlos
+            byte[] encodedBytes = Base64.getEncoder().encode(audioData);
+
+            if (room_message) {
+                output.println("VOICE_ROOM " + currentRoom + " " + username + " " + new String(encodedBytes));
+            } else {
+                output.println("VOICE " + new String(encodedBytes));
             }
-            System.out.println("Recording saved as " + audioFilePath);
+
+            System.out.println("Audio sent successfully!");
+
         } catch (LineUnavailableException | IOException | InterruptedException e) {
             e.printStackTrace();
         }
-        return audioFilePath;
     }
 
     // Método para imprimir el menú
