@@ -1,15 +1,19 @@
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class Chatters {
     private final Map<String, PrintWriter> users;
+    private final Map<String, List<String>> chatHistories;
     private final Map<String, Map<String, PrintWriter>> chatRooms;
 
     public Chatters() {
         users = new HashMap<>();
         chatRooms = new HashMap<>();
+        chatHistories = new HashMap<>();
     }
 
     public void addUser(String name, PrintWriter writer) {
@@ -51,8 +55,10 @@ public class Chatters {
     }
 
     // Crear sala de chat
-    public void createRoom(String roomName) {
+    public void createRoom(String roomName, String creator) {
+        chatHistories.put(roomName, new ArrayList<>());
         chatRooms.put(roomName, new HashMap<>());
+        addUserToRoom(roomName, creator);
     }
 
     // Añadir usuario a sala de chat
@@ -67,6 +73,7 @@ public class Chatters {
     public void broadcastToRoom(String roomName, String msg) {
         Map<String, PrintWriter> room = chatRooms.get(roomName);
         if (room != null) {
+            chatHistories.get(roomName).add(msg);
             for (PrintWriter writer : room.values()) {
                 writer.println(msg);
             }
@@ -80,5 +87,22 @@ public class Chatters {
 
     public Set<String> getRooms() {
         return chatRooms.keySet();
+    }
+
+    // Método para obtener el historial de una sala
+    public List<String> getRoomHistory(String roomName) {
+        return chatHistories.get(roomName);
+    }
+
+     // Enviar nota de voz a una sala
+     public void sendVoiceMessageToRoom(String roomName, String from, String audioFilePath) {
+        Map<String, PrintWriter> room = chatRooms.get(roomName);
+        if (room != null) {
+            String voiceMessage = "VOICE_ROOM " + roomName + " " + from + " " + audioFilePath;
+            chatHistories.get(roomName).add(voiceMessage); // Guardar nota de voz en el historial
+            for (PrintWriter writer : room.values()) {
+                writer.println(voiceMessage);
+            }
+        }
     }
 }

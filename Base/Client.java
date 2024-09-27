@@ -5,6 +5,7 @@ import java.net.Socket;
 public class Client extends Person {
 
     private static volatile boolean isRunning = true; // Bandera para controlar el hilo de escucha
+    private static String currentRoom = null;
 
     public Client(String userName, Socket socket) throws IOException {
         super(userName, socket);
@@ -27,22 +28,39 @@ public class Client extends Person {
             username = console.readLine();
             output.println(username);
 
-         
             // Crear un hilo separado para escuchar mensajes del servidor
             Thread listenThread = new Thread(() -> {
                 try {
                     String serverMessage;
                     while (isRunning && (serverMessage = input.readLine()) != null) {
                         System.out.println(serverMessage);
-                        if (serverMessage.startsWith("VOICE")) {
-                            String[] parts = serverMessage.split(" ", 3);
-                            if (parts.length == 3) {
+                        String[] parts = serverMessage.split(" ", 4);
+                        if (parts.length == 3) {
+                            System.out.println("parts[0]: " + parts[0]);
+                            if (parts[0].equals("VOICE")) {
                                 String sender = parts[1];
                                 if (sender.equals(username)) {
-                                    continue; // No reproducir el audio grabado por el mismo usuario
+                                    continue;
                                 }
                                 String audioFilePath = parts[2];
                                 playAudio(audioFilePath);
+                            } else if (parts[0].equals("Joined room:")) {
+                                currentRoom = parts[1].trim();
+                                System.out.println("You are now in room: " + currentRoom);
+                            }
+                        } else if (parts.length == 4) {
+                            if (parts[0].equals("VOICE_ROOM")) {
+                                String sender = parts[2];
+                                if (sender.equals(username)) {
+                                    continue;
+                                }
+                                if (currentRoom == null) {
+                                    continue;
+                                }
+                                if (currentRoom.equals(parts[1])) {
+                                    String audioFilePath = parts[3];
+                                    playAudio(audioFilePath);
+                                }
                             }
                         }
                     }
@@ -59,8 +77,7 @@ public class Client extends Person {
             // Mientras tanto, en el hilo principal se maneja la entrada del usuario
             String choice, msg;
 
-            label:
-            while (true) {
+            label: while (true) {
                 printMenu();
                 choice = console.readLine();
 
@@ -84,6 +101,7 @@ public class Client extends Person {
                     case "4":
                         System.out.println("Enter room name to create: ");
                         String roomName = console.readLine();
+                        currentRoom = roomName;
                         output.println("CREATE_ROOM " + roomName);
                         break;
                     case "5":
@@ -91,13 +109,33 @@ public class Client extends Person {
                         System.out.println("Enter room name to join: ");
                         roomName = console.readLine();
                         output.println("JOIN_ROOM " + roomName);
+                        currentRoom = roomName;
                         break;
                     case "6":
-                        System.out.println("Enter message to send to room: ");
-                        msg = console.readLine();
-                        output.println("ROOM_MSG " + msg);
+                        if (currentRoom != null) {
+                            System.out.println("Enter message to send to room: ");
+                            msg = console.readLine();
+                            output.println("ROOM_MSG " + msg);
+                        } else {
+                            System.out.println("You are not in any room. Join a room first.");
+                        }
                         break;
                     case "7":
+                        if (currentRoom != null) {
+                            audioFilePath = recordAudio();
+                            output.println("VOICE_ROOM " + currentRoom + " " + username + " " + audioFilePath);
+                        } else {
+                            System.out.println("Error: You are not in any room.");
+                        }
+                        break;
+                    case "8":
+                        if (currentRoom != null) {
+                            output.println("GET_HISTORY " + currentRoom);
+                        } else {
+                            System.out.println("Error: You are not in any room.");
+                        }
+                        break;
+                    case "9":
                         System.out.println("Exiting chat ...");
                         output.println("EXIT");
                         isRunning = false; // Detener el hilo de escucha
@@ -115,8 +153,6 @@ public class Client extends Person {
             input.close();
             output.close();
             server.close();
-
-            
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -180,7 +216,9 @@ public class Client extends Person {
                 4. Create a chat room
                 5. Join a chat room
                 6. Send message to room
-                7. Exit
+                7. Send voice message to room
+                8. View room history
+                9. Exit
                 """);
     }
 }

@@ -16,7 +16,6 @@ public class Server {
                 Socket client = serverSocket.accept();
                 System.out.println("Cliente conectado desde " + client.getInetAddress());
                 ClientHandler handler = new ClientHandler(client, chatters);
-                System.out.println("Debajo de ClientHandler");
                 Thread thread = new Thread(handler);
                 thread.start();
             }

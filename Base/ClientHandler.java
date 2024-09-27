@@ -21,73 +21,61 @@ public class ClientHandler implements Runnable {
             BufferedReader reader = new BufferedReader(new InputStreamReader(client.getInputStream()));
             PrintWriter writer = new PrintWriter(client.getOutputStream(), true);
 
-
             username = reader.readLine();
             chatters.addUser(username, writer);
 
             String msg;
             while ((msg = reader.readLine()) != null) {
                 // Verificar si el mensaje es para enviar un mensaje privado
-                if (msg.startsWith("PRIVATE")) {
-                    String[] splitMsg = msg.split(" ", 3); // Cambiar a 3 para incluir el contenido del mensaje
-                    if (splitMsg.length == 3) {
-                        String recipient = splitMsg[1].trim(); // El segundo elemento es el destinatario
-                        String content = splitMsg[2].trim(); // El tercer elemento es el contenido del mensaje
-                        if (recipient.equals(username)) {
-                            writer.println("Error: No puedes enviarte mensajes privados a ti mismo.");
-                        } else {
-                            chatters.privateMessage(username, recipient, content);
-                        }
+                String[] splitMsg = msg.split(" ", 4);
+                if (splitMsg[0].equals("PRIVATE")) {
+                    String recipient = splitMsg[1].trim(); // El segundo elemento es el destinatario
+                    String content = splitMsg[2].trim(); // El tercer elemento es el contenido del mensaje
+                    if (recipient.equals(username)) {
+                        writer.println("Error: No puedes enviarte mensajes privados a ti mismo.");
                     } else {
-                        writer.println("Error: Formato de mensaje privado incorrecto.");
+                        chatters.privateMessage(username, recipient, content);
                     }
-
-                } else if (msg.equals("EXIT")) {
+                } else if (splitMsg[0].equals("EXIT")) {
                     // Salir del bucle y cerrar la conexión removiendolo de la lista de usuarios
                     chatters.removeUser(username);
                     break;
-                } else if (msg.startsWith("VOICE")) {
-                    String[] voiceData = msg.split(" ", 3);
-                    if (voiceData.length == 3) {
-                        String audioFilePath = voiceData[2];
-                        chatters.sendVoiceMessage(username, audioFilePath);
-                    }
-                }else if(msg.startsWith("CREATE_ROOM")) {
-                    String[] splitMsg = msg.split(" ", 2);
-                    if (splitMsg.length == 2) {
-                        String roomName = splitMsg[1].trim();
-                        chatters.createRoom(roomName);
-                    } else {
-                        writer.println("Error: Formato de creación de sala incorrecto.");
-                    }
-                } else if (msg.startsWith("JOIN_ROOM")) {
-                    String[] splitMsg = msg.split(" ", 2);
-                    if (splitMsg.length == 2) {
-                        String roomName = splitMsg[1].trim();
-                        if (chatters.roomExists(roomName)) {
-                            chatters.addUserToRoom(roomName, username);
-                            currentRoom = roomName;
-                            writer.println("Joined room: " + roomName);
-                        }else{
-                            writer.println("Error: Room " + roomName + "does not exist. ");
-
-                        }
-                    }
-                }else if(msg.startsWith("LIST_ROOMS")){
-                    writer.println("Rooms available:  " + chatters.getRooms());  
-                    }else if (msg.startsWith("ROOM_MSG")){
-
+                } else if (splitMsg[0].equals("VOICE")) {
+                    String audioFilePath = splitMsg[2];
+                    chatters.sendVoiceMessage(username, audioFilePath);
+                } else if (splitMsg[0].equals("VOICE_ROOM")) {
+                    String[] voiceData = msg.split(" ", 4);
+                    String audioFilePath = voiceData[3];
                     if (currentRoom != null) {
-                        String[] splitMsg = msg.split(" ", 2);
-                        if (splitMsg.length == 2) {
-                            String content = splitMsg[1];
-                            chatters.broadcastToRoom(currentRoom, username + ": " + content);
-                        }
-                        
-                    }else{
+                        chatters.sendVoiceMessageToRoom(currentRoom, username, audioFilePath); // Enviar voz a sala
+                    }
+                }
+                if (splitMsg[0].equals("CREATE_ROOM")) {
+                    String roomName = splitMsg[1].trim();
+                    chatters.createRoom(roomName, username); // Crear y unirse automáticamente
+                    currentRoom = roomName;
+                    writer.println("Created and joined room: " + roomName);
+                } else if (splitMsg[0].equals("JOIN_ROOM")) {
+                    String roomName = splitMsg[1].trim();
+                    if (chatters.roomExists(roomName)) {
+                        chatters.addUserToRoom(roomName, username);
+                        currentRoom = roomName;
+                        writer.println("Joined room: " + roomName);
+                    } else {
+                        writer.println("Error: Room " + roomName + "does not exist. ");
+
+                    }
+
+                } else if (splitMsg[0].equals("LIST_ROOMS")) {
+                    writer.println("Rooms available:  " + chatters.getRooms());
+                } else if (splitMsg[0].equals("ROOM_MSG")) {
+                    if (currentRoom != null) {
+                        String content = msg.split(" ", 2)[1];
+                        chatters.broadcastToRoom(currentRoom, username + ": " + content);
+                    } else {
                         writer.println("Error: You are not in any room.");
                     }
-                }else {
+                } else {
                     // Si no es un mensaje privado, lo enviamos al grupo
                     chatters.broadCastMessage(username + ": " + msg);
                 }
@@ -101,12 +89,11 @@ public class ClientHandler implements Runnable {
                 if (client != null) {
                     client.close();
                 }
-               
+
             } catch (IOException e) {
                 System.out.println(e.getMessage());
             }
         }
     }
-
 
 }
