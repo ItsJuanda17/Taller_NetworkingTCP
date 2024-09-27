@@ -60,7 +60,15 @@ public class ClientHandler implements Runnable {
         } catch (IOException e) {
             System.out.println(e.getMessage());
         } finally {
-            chatters.removeUser(username); // Eliminar el usuario al salir
+            try {
+                chatters.removeUser(username);
+                if (client != null) {
+                    client.close();
+                }
+               
+            } catch (IOException e) {
+                System.out.println(e.getMessage());
+            }
         }
     }
 
