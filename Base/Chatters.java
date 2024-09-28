@@ -54,6 +54,24 @@ public class Chatters {
         }
     }
 
+    // Método para enviar un mensaje de voz privado entre dos usuarios
+    public void sendPrivateVoiceMessage(String from, String to, String voiceData) {
+         PrintWriter recipientWriter = users.get(to);
+         if (recipientWriter != null) {
+        // Envía el mensaje de voz al destinatario
+             recipientWriter.println("PRIVATE_VOICE " + from + " " + voiceData);
+         } else {
+             PrintWriter senderWriter = users.get(from);
+             if (senderWriter != null) {
+            // Informar al remitente si el destinatario no existe
+                 senderWriter.println("Error: User " + to + " not found.");
+             }
+        }
+    }
+  
+
+    
+
     // Crear sala de chat
     public void createRoom(String roomName, String creator) {
         chatHistories.put(roomName, new ArrayList<>());

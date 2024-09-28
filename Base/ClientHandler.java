@@ -38,6 +38,15 @@ public class ClientHandler implements Runnable {
                     } else {
                         chatters.privateMessage(username, recipient, content);
                     }
+                } else if (splitMsg[0].equals("PRIVATE_VOICE")) {
+                    String recipient = splitMsg[1].trim();  // Usuario destinatario
+                    String voiceData = splitMsg[2].trim();  // Datos del mensaje de voz
+                    if (recipient.equals(username)) {
+                        writer.println("Error: No puedes enviarte mensajes de voz a ti mismo.");
+                    } else {
+                        chatters.sendPrivateVoiceMessage(username, recipient, voiceData);
+                }
+                
                 } else if (splitMsg[0].equals("EXIT")) {
                     // Salir del bucle y cerrar la conexión removiendolo de la lista de usuarios
                     chatters.removeUser(username);
