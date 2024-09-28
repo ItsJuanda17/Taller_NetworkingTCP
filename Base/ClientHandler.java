@@ -9,6 +9,8 @@ public class ClientHandler implements Runnable {
     private final Chatters chatters;
     private String username;
     private String currentRoom;
+    private boolean inCall;
+    private String callRecipient;
 
     public ClientHandler(Socket client, Chatters chatters) {
         this.client = client;
@@ -73,6 +75,32 @@ public class ClientHandler implements Runnable {
                         chatters.broadcastToRoom(currentRoom, username + ": " + content);
                     } else {
                         writer.println("Error: You are not in any room.");
+                    }
+                } else if (splitMsg[0].equals("CALL")) {
+                    String recipient = splitMsg[1].trim();
+                    if (chatters.userExists(recipient)) {
+                        PrintWriter recipientWriter = chatters.getWriter(recipient);
+                        recipientWriter.println(username + " is calling you. Type ACCEPT or REJECT");
+                        String recipientResponse = reader.readLine();
+                        if ("ACCEPT".equals(recipientResponse)) {
+                            inCall = true;
+                            callRecipient = recipient;
+                            writer.println("ACCEPT");
+                            recipientWriter.println("Call Acepted. Starting voice chat.");
+                        } else if ("REJECT".equals(recipientResponse)) {
+                            writer.println("REJECT");
+                            recipientWriter.println("Call Rejected.");
+                        }
+                    } else {
+                        writer.println("User did not respond.");
+                    }
+                } else if (splitMsg[0].equals("END_CALL")) {
+                    if (inCall) {
+                        PrintWriter recipientWriter = chatters.getWriter(callRecipient);
+                        recipientWriter.println("END_CALL");
+                        inCall = false;
+                        callRecipient = null;
+                        break;
                     }
                 } else {
                     // Si no es un mensaje privado, lo enviamos al grupo

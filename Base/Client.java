@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Client extends Person {
 
     private static volatile boolean isRunning = true; // Bandera para controlar el hilo de escucha
+    private static volatile boolean inCall = false;
     private static String currentRoom = null;
 
     public Client(String userName, Socket socket) throws IOException {
@@ -144,6 +145,20 @@ public class Client extends Person {
                         }
                         break;
                     case "9":
+                        System.out.println("Enter the username to call:");
+                        String callUser = console.readLine();
+                        voiceCall(output, input, callUser); // Iniciar llamada de voz
+                        break;
+                    case "10":
+                        startVoiceCall(output, input, username);
+                        break;
+                    case "11":
+                        rejectCall(output);
+                        break;
+                    case "12":
+                        endCall(output);
+                        break;
+                    case "13":
                         System.out.println("Exiting chat ...");
                         output.println("EXIT");
                         isRunning = false; // Detener el hilo de escucha
@@ -243,6 +258,108 @@ public class Client extends Person {
         }
     }
 
+    // Método para iniciar la llamada en tiempo real
+    public static void voiceCall(PrintWriter output, BufferedReader input, String targetUser) {
+        System.out.println("Calling " + targetUser + "...");
+        output.println("CALL " + targetUser); // Enviamos una solicitud de llamada al usuario objetivo
+    }
+
+    public static void startVoiceCall(PrintWriter output, BufferedReader input, String targetUser) throws IOException {
+        System.out.println(targetUser + " accepted the call. Starting voice communication...");
+        inCall = true;
+
+        // Hilo para enviar audio de manera continua
+        Thread sendAudioThread = new Thread(() -> {
+            try {
+                sendRealTimeAudio(output); // Método para enviar audio
+            } catch (Exception e) {
+                System.out.println("Error during sending audio: " + e.getMessage());
+            }
+        });
+
+        // Hilo para recibir audio de manera continua
+        Thread receiveAudioThread = new Thread(() -> {
+            try {
+                receiveRealTimeAudio(input); // Método para recibir audio
+            } catch (Exception e) {
+                System.out.println("Error during receiving audio: " + e.getMessage());
+            }
+        });
+
+        // Iniciar ambos hilos
+        sendAudioThread.start();
+        receiveAudioThread.start();
+
+        try {
+            // Unir ambos hilos cuando la llamada termine
+            sendAudioThread.join();
+            receiveAudioThread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            Thread.currentThread().interrupt(); // Restore the interrupted status
+        }
+    }
+
+    public static void rejectCall(PrintWriter output) {
+        inCall = false;
+        output.println("REJECT");
+        System.out.println("Call rejected.");
+    }
+
+    // Método para enviar audio en tiempo real
+    private static void sendRealTimeAudio(PrintWriter output) {
+        AudioFormat format = new AudioFormat(44100, 16, 1, true, true);
+        try (TargetDataLine microphone = AudioSystem.getTargetDataLine(format)) {
+            microphone.open(format);
+            microphone.start();
+
+            byte[] buffer = new byte[4096]; // Buffer para almacenar el audio
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+            System.out.println("Streaming audio...");
+
+            while (inCall) {
+                int bytesRead = microphone.read(buffer, 0, buffer.length); // Capturar audio en el buffer
+                if (bytesRead > 0) {
+                    byteArrayOutputStream.write(buffer, 0, bytesRead);
+                    byte[] encodedAudio = Base64.getEncoder().encode(byteArrayOutputStream.toByteArray());
+                    output.println("VOICE " + new String(encodedAudio)); // Enviar audio codificado
+                    byteArrayOutputStream.reset(); // Limpiar el stream
+                }
+            }
+
+            microphone.stop();
+            microphone.close();
+            System.out.println("Audio streaming ended.");
+
+        } catch (LineUnavailableException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Método para recibir audio en tiempo real
+    private static void receiveRealTimeAudio(BufferedReader input) throws IOException {
+        System.out.println("Receiving real-time audio...");
+
+        String serverMessage;
+        while (inCall && (serverMessage = input.readLine()) != null) {
+            String[] parts = serverMessage.split(" ", 3);
+            if (parts.length == 3 && "VOICE".equals(parts[0])) {
+                String encodedAudio = parts[2]; // Obtener el audio codificado
+                playVoiceData(encodedAudio); // Reproducir el audio recibido
+            }
+        }
+
+        System.out.println("Stopped receiving audio.");
+    }
+
+    // Método para terminar la llamada
+    public static void endCall(PrintWriter output) {
+        inCall = false;
+        output.println("END_CALL");
+        System.out.println("Call ended.");
+    }
+
     // Método para imprimir el menú
     private static void printMenu() {
         System.out.println("""
@@ -255,7 +372,11 @@ public class Client extends Person {
                 6. Send message to room
                 7. Send voice message to room
                 8. View room history
-                9. Exit
+                9. Call a user
+                10. Accept call
+                11. Reject call
+                12. End call
+                13. Exit chat
                 """);
     }
 }

@@ -105,4 +105,14 @@ public class Chatters {
             }
         }
     }
+
+    // Verifica si un usuario está en línea
+    public boolean userExists(String username) {
+        return users.containsKey(username);
+    }
+
+    // Devuelve el PrintWriter de un usuario específico
+    public PrintWriter getWriter(String username) {
+        return users.get(username);
+    }
 }
