@@ -130,7 +130,7 @@ public class Client extends Person {
                     sendPrivateMessage(console, output);
                     break;
                 case "3":
-                    recordAndSendAudio(output, currentRoom != null);
+                    sendVoiceMessage(output, false);
                     break;
                 case "4":
                     createChatRoom(console, output);
@@ -210,7 +210,7 @@ public class Client extends Person {
 
     private static void sendVoiceMessageToRoom(PrintWriter output) throws IOException {
         if (currentRoom != null) {
-            recordAndSendAudio(output, true);
+            sendVoiceMessage(output, true);
             System.in.read();
         } else {
             System.out.println("Error: You are not in any room.");
@@ -265,7 +265,7 @@ public class Client extends Person {
     }
 
     // Método ajustado para grabar y enviar audio
-    private static void recordAndSendAudio(PrintWriter output, boolean isRoomMessage) {
+    private static void sendVoiceMessage(PrintWriter output, boolean isRoomMessage) {
         AudioFormat format = new AudioFormat(44100, 16, 1, true, true);
         AtomicBoolean recording = new AtomicBoolean(true);
 
