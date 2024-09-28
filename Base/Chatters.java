@@ -47,13 +47,6 @@ public class Chatters {
         }
     }
 
-    // Enviar mensaje de voz
-    public void sendVoiceMessage(String from, String audioFilePath) {
-        for (PrintWriter writer : users.values()) {
-            writer.println("VOICE " + from + " " + audioFilePath);
-        }
-    }
-
     // Método para enviar un mensaje de voz privado entre dos usuarios
     public void sendPrivateVoiceMessage(String from, String to, String voiceData) {
          PrintWriter recipientWriter = users.get(to);

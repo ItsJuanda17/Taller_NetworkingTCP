@@ -142,10 +142,10 @@ public class Client extends Person {
                     sendMessageToRoom(console, output);
                     break;
                 case "7":
-                    sendVoiceMessageToRoom(console, output);
+                    sendVoiceMessageToRoom(output);
                     break;
                 case "8":
-                    viewRoomHistory(console, output);
+                    viewRoomHistory(output);
                     break;
                 case "9":
                     callUser(console, output);
@@ -208,7 +208,7 @@ public class Client extends Person {
         }
     }
 
-    private static void sendVoiceMessageToRoom(BufferedReader console, PrintWriter output) throws IOException {
+    private static void sendVoiceMessageToRoom(PrintWriter output) throws IOException {
         if (currentRoom != null) {
             recordAndSendAudio(output, true);
             System.in.read();
@@ -217,7 +217,7 @@ public class Client extends Person {
         }
     }
 
-    private static void viewRoomHistory(BufferedReader console, PrintWriter output) throws IOException {
+    private static void viewRoomHistory(PrintWriter output) {
         if (currentRoom != null) {
             output.println("GET_HISTORY " + currentRoom);
         } else {
@@ -228,10 +228,10 @@ public class Client extends Person {
     private static void callUser (BufferedReader console, PrintWriter output) throws IOException {
         System.out.println("Enter the username of the person you want to call: ");
         String targetUser = console.readLine();
-        voiceCall(output, console, targetUser);
+        voiceCall(output, targetUser);
     }
 
-    private static void acceptCall(BufferedReader console, PrintWriter output) throws IOException {
+    private static void acceptCall(BufferedReader console, PrintWriter output) {
         startVoiceCall(output, console, output.toString()); // Debes pasar el usuario correcto aquí
     }
 
@@ -276,19 +276,7 @@ public class Client extends Person {
 
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
-            Thread recordingThread = new Thread(() -> {
-                try (AudioInputStream audioInputStream = new AudioInputStream(line)) {
-                    byte[] buffer = new byte[4096];
-                    int bytesRead;
-                    while (recording.get() && (bytesRead = audioInputStream.read(buffer)) != -1) {
-                        byteArrayOutputStream.write(buffer, 0, bytesRead);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-
-            recordingThread.start();
+            Thread recordingThread = getThread(line, recording, byteArrayOutputStream);
 
             // Esperar a que el usuario presione ENTER
             System.in.read(); // Espera ENTER para detener la grabación
@@ -315,7 +303,24 @@ public class Client extends Person {
         }
     }
 
-    public static void voiceCall(PrintWriter output, BufferedReader input, String targetUser) {
+    private static Thread getThread(TargetDataLine line, AtomicBoolean recording, ByteArrayOutputStream byteArrayOutputStream) {
+        Thread recordingThread = new Thread(() -> {
+            try (AudioInputStream audioInputStream = new AudioInputStream(line)) {
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while (recording.get() && (bytesRead = audioInputStream.read(buffer)) != -1) {
+                    byteArrayOutputStream.write(buffer, 0, bytesRead);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
+        recordingThread.start();
+        return recordingThread;
+    }
+
+    public static void voiceCall(PrintWriter output, String targetUser) {
         System.out.println("Calling " + targetUser + "...");
         output.println("CALL " + targetUser); // Enviamos una solicitud de llamada al usuario objetivo
     }
@@ -366,7 +371,7 @@ public class Client extends Person {
         }
     }
 
-    public static void startVoiceCall(PrintWriter output, BufferedReader input, String targetUser) throws IOException {
+    public static void startVoiceCall(PrintWriter output, BufferedReader input, String targetUser) {
         System.out.println(targetUser + " accepted the call. Starting voice communication...");
         inCall = true;
 
