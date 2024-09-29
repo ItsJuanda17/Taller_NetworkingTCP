@@ -9,6 +9,7 @@ public class Client extends Person {
     private static volatile boolean isRunning = true; // Bandera para controlar el hilo de escucha
     private static volatile boolean inCall = false; // Bandera para indicar si está en llamada
     private static String currentRoom = null; // Almacena la sala actual
+    private static String caller = null; // Almacena el usuario que llama
 
     public Client(String userName, Socket socket) throws IOException {
         super(userName, socket);
@@ -22,7 +23,7 @@ public class Client extends Person {
             PrintWriter output = new PrintWriter(server.getOutputStream(), true);
 
             String username = requestUsername(console, output); // Solicitar nombre de usuario
-            Thread listenThread = startListeningThread(input, username); // Iniciar hilo de escucha
+            Thread listenThread = startListeningThread(input, username, output); // Iniciar hilo de escucha
 
             handleUserInput(console, output); // Manejar la entrada del usuario
 
@@ -52,12 +53,12 @@ public class Client extends Person {
         return username;
     }
 
-    private static Thread startListeningThread(BufferedReader input, String username) {
+    private static Thread startListeningThread(BufferedReader input, String username, PrintWriter output) {
         Thread listenThread = new Thread(() -> {
             try {
                 String serverMessage;
                 while (isRunning && (serverMessage = input.readLine()) != null) {
-                    handleServerMessage(serverMessage, username); // Manejar mensajes del servidor
+                    handleServerMessage(serverMessage, username, output); // Manejar mensajes del servidor
                 }
             } catch (IOException e) {
                 if (isRunning) {
@@ -71,7 +72,7 @@ public class Client extends Person {
         return listenThread;
     }
 
-    private static void handleServerMessage(String serverMessage, String username) {
+    private static void handleServerMessage(String serverMessage, String username, PrintWriter output) {
         String[] parts = serverMessage.split(" ", 4);
         boolean isVoiceMessage = parts[0].startsWith("VOICE") || parts[0].startsWith("Voice")
                 || parts[0].startsWith("VOICE_ROOM");
@@ -80,11 +81,24 @@ public class Client extends Person {
             System.out.println(serverMessage);
         }
 
-        if (parts.length == 3) {
+        if (parts.length == 2) {
+            if (parts[0].equals("CALL")) {
+                caller = parts[1];
+                System.out.println("Incoming call from: " + caller);
+            }
+            if (parts[0].equals("CALL_REJECTED")) {
+                System.out.println(parts[1] + " rejected your call.");
+            }
+            if (parts[0].equals("CALL_ACCEPTED")) {
+                inCall = true;
+                System.out.println(parts[1] + " accepted your call.");
+                startVoiceCall(output, new BufferedReader(new InputStreamReader(System.in)), parts[1]);
+            }
+        } else if (parts.length == 3) {
             if (parts[0].equals("VOICE")) {
                 handleVoiceMessage(parts, username);
             } else if (parts[0].equals("Joined room:")) {
-                currentRoom = parts[1].trim();
+                currentRoom = parts[1];
                 System.out.println("You are now in room: " + currentRoom);
             }
         } else if (parts.length == 4) {
@@ -118,7 +132,8 @@ public class Client extends Person {
 
     private static void handleUserInput(BufferedReader console, PrintWriter output) throws IOException {
         String choice;
-        label: while (true) {
+        label:
+        while (true) {
             printMenu();
             choice = console.readLine();
 
@@ -225,14 +240,20 @@ public class Client extends Person {
         }
     }
 
-    private static void callUser (BufferedReader console, PrintWriter output) throws IOException {
+    private static void callUser(BufferedReader console, PrintWriter output) throws IOException {
         System.out.println("Enter the username of the person you want to call: ");
         String targetUser = console.readLine();
-        voiceCall(output, targetUser);
+        System.out.println("Calling " + targetUser + "...");
+        output.println("CALL " + targetUser); // Enviamos una solicitud de llamada al usuario objetivo
     }
 
     private static void acceptCall(BufferedReader console, PrintWriter output) {
-        startVoiceCall(output, console, output.toString()); // Debes pasar el usuario correcto aquí
+        if (caller == null) {
+            System.out.println("No incoming calls.");
+            return;
+        }
+        output.println("CALL_ACCEPTED " + caller);
+        startVoiceCall(output, console, caller); // Debes pasar el usuario correcto aquí
     }
 
     private static void exitChat(PrintWriter output) {
@@ -291,7 +312,9 @@ public class Client extends Person {
             byte[] encodedBytes = Base64.getEncoder().encode(audioData);
 
             if (isRoomMessage) {
-                output.println("VOICE_ROOM " + currentRoom + " " + new String(encodedBytes));
+                System.out.println("Sending audio to room: " + currentRoom);
+                String message = "VOICE_ROOM " + currentRoom + " " + new String(encodedBytes);
+                output.println(message);
             } else {
                 output.println("VOICE " + new String(encodedBytes));
             }
@@ -303,7 +326,8 @@ public class Client extends Person {
         }
     }
 
-    private static Thread getThread(TargetDataLine line, AtomicBoolean recording, ByteArrayOutputStream byteArrayOutputStream) {
+    private static Thread getThread(TargetDataLine line, AtomicBoolean recording,
+                                    ByteArrayOutputStream byteArrayOutputStream) {
         Thread recordingThread = new Thread(() -> {
             try (AudioInputStream audioInputStream = new AudioInputStream(line)) {
                 byte[] buffer = new byte[4096];
@@ -320,34 +344,35 @@ public class Client extends Person {
         return recordingThread;
     }
 
-    public static void voiceCall(PrintWriter output, String targetUser) {
-        System.out.println("Calling " + targetUser + "...");
-        output.println("CALL " + targetUser); // Enviamos una solicitud de llamada al usuario objetivo
-    }
-
     // Método para recibir audio en tiempo real
     private static void receiveRealTimeAudio(BufferedReader input) throws IOException {
         System.out.println("Receiving real-time audio...");
 
         String serverMessage;
-        while (inCall && (serverMessage = input.readLine()) != null) {
+        while (inCall) {
+            serverMessage = input.readLine();
             String[] parts = serverMessage.split(" ", 3);
-            if (parts.length == 3 && "VOICE".equals(parts[0])) {
-                String encodedAudio = parts[2]; // Obtener el audio codificado
-                playVoiceData(encodedAudio); // Reproducir el audio recibido
+            if (parts[0].equals("CALL_AUDIO")) {
+                String sender = parts[1];
+                if (sender.equals(caller)) {
+                    String audioData = parts[2];
+                    playVoiceData(audioData);
+                }
+            } else if (parts[0].equals("END_CALL")) {
+                inCall = false;
             }
         }
 
         System.out.println("Stopped receiving audio.");
     }
 
-    private static void sendRealTimeAudio(PrintWriter output) {
+    private static void sendRealTimeAudio(PrintWriter output, String targetUser) {
         AudioFormat format = new AudioFormat(44100, 16, 1, true, true);
         try (TargetDataLine microphone = AudioSystem.getTargetDataLine(format)) {
             microphone.open(format);
             microphone.start();
 
-            byte[] buffer = new byte[4096]; // Buffer para almacenar el audio
+            byte[] buffer = new byte[4096]; // Buffer para almacenar el audio capturado
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
             System.out.println("Streaming audio...");
@@ -357,7 +382,7 @@ public class Client extends Person {
                 if (bytesRead > 0) {
                     byteArrayOutputStream.write(buffer, 0, bytesRead);
                     byte[] encodedAudio = Base64.getEncoder().encode(byteArrayOutputStream.toByteArray());
-                    output.println("VOICE " + new String(encodedAudio)); // Enviar audio codificado
+                    output.println("CALL_AUDIO " + targetUser + " " + new String(encodedAudio));
                     byteArrayOutputStream.reset(); // Limpiar el stream
                 }
             }
@@ -372,13 +397,11 @@ public class Client extends Person {
     }
 
     public static void startVoiceCall(PrintWriter output, BufferedReader input, String targetUser) {
-        System.out.println(targetUser + " accepted the call. Starting voice communication...");
         inCall = true;
-
         // Hilo para enviar audio de manera continua
         Thread sendAudioThread = new Thread(() -> {
             try {
-                sendRealTimeAudio(output); // Método para enviar audio
+                sendRealTimeAudio(output, targetUser); // Método para enviar audio
             } catch (Exception e) {
                 System.out.println("Error during sending audio: " + e.getMessage());
             }
@@ -407,7 +430,6 @@ public class Client extends Person {
         }
     }
 
-
     public static void endCall(PrintWriter output) {
         inCall = false;
         output.println("END_CALL");
@@ -416,8 +438,13 @@ public class Client extends Person {
 
     public static void rejectCall(PrintWriter output) {
         inCall = false;
-        output.println("REJECT");
-        System.out.println("Call rejected.");
+        if (caller == null) {
+            System.out.println("No incoming calls.");
+        } else {
+            output.println("CALL_REJECTED " + caller);
+            System.out.println("Call rejected.");
+            caller = null;
+        }
     }
 
     private static void printMenu() {

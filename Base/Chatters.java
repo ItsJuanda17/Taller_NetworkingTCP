@@ -49,21 +49,78 @@ public class Chatters {
 
     // Método para enviar un mensaje de voz privado entre dos usuarios
     public void sendPrivateVoiceMessage(String from, String to, String voiceData) {
-         PrintWriter recipientWriter = users.get(to);
-         if (recipientWriter != null) {
-        // Envía el mensaje de voz al destinatario
-             recipientWriter.println("PRIVATE_VOICE " + from + " " + voiceData);
-         } else {
-             PrintWriter senderWriter = users.get(from);
-             if (senderWriter != null) {
-            // Informar al remitente si el destinatario no existe
-                 senderWriter.println("Error: User " + to + " not found.");
-             }
+        PrintWriter recipientWriter = users.get(to);
+        if (recipientWriter != null) {
+            // Envía el mensaje de voz al destinatario
+            recipientWriter.println("PRIVATE_VOICE " + voiceData);
+        } else {
+            PrintWriter senderWriter = users.get(from);
+            if (senderWriter != null) {
+                // Informar al remitente si el destinatario no existe
+                senderWriter.println("Error: User " + to + " not found.");
+            }
         }
     }
-  
 
-    
+    // Método para llamadas de voz privadas
+    public void callUser(String from, String to) {
+        PrintWriter recipientWriter = users.get(to);
+        if (recipientWriter != null) {
+            // Enviar mensaje de llamada al destinatario
+            recipientWriter.println("CALL " + from);
+        } else {
+            PrintWriter senderWriter = users.get(from);
+            if (senderWriter != null) {
+                // Informar al remitente si el destinatario no existe
+                senderWriter.println("Error: User " + to + " not found.");
+            }
+        }
+    }
+
+    // Método para aceptar llamadas de voz
+    public void acceptCall(String from, String to) {
+        PrintWriter recipientWriter = users.get(to);
+        if (recipientWriter != null) {
+            // Enviar mensaje de aceptación al remitente
+            recipientWriter.println("CALL_ACCEPTED " + from);
+        } else {
+            PrintWriter senderWriter = users.get(from);
+            if (senderWriter != null) {
+                // Informar al remitente si el destinatario no existe
+                senderWriter.println("Error: User " + to + " not found.");
+            }
+        }
+    }
+
+    // Método para rechazar llamadas de voz
+    public void rejectCall(String from, String to) {
+        PrintWriter recipientWriter = users.get(to);
+        if (recipientWriter != null) {
+            // Enviar mensaje de rechazo al remitente
+            recipientWriter.println("CALL_REJECTED " + from);
+        } else {
+            PrintWriter senderWriter = users.get(from);
+            if (senderWriter != null) {
+                // Informar al remitente si el destinatario no existe
+                senderWriter.println("Error: User " + to + " not found.");
+            }
+        }
+    }
+
+    // Método para enviar el audio de una llamada
+    public void sendCallAudio(String from, String to, String audioData) {
+        PrintWriter recipientWriter = users.get(to);
+        if (recipientWriter != null) {
+            // Enviar audio de llamada al destinatario
+            recipientWriter.println("CALL_AUDIO " + from + " " + audioData);
+        } else {
+            PrintWriter senderWriter = users.get(from);
+            if (senderWriter != null) {
+                // Informar al remitente si el destinatario no existe
+                senderWriter.println("Error: User " + to + " not found.");
+            }
+        }
+    }
 
     // Crear sala de chat
     public void createRoom(String roomName, String creator) {
@@ -114,16 +171,16 @@ public class Chatters {
             for (PrintWriter writer : room.values()) {
                 writer.println(voiceMessage);
             }
+        } else {
+            PrintWriter senderWriter = users.get(from);
+            if (senderWriter != null) {
+                senderWriter.println("Error: You are not in room " + roomName);
+            }
         }
     }
 
     // Verifica si un usuario está en línea
     public boolean userExists(String username) {
         return users.containsKey(username);
-    }
-
-    // Devuelve el PrintWriter de un usuario específico
-    public PrintWriter getWriter(String username) {
-        return users.get(username);
     }
 }

@@ -33,9 +33,9 @@ public class ClientHandler implements Runnable {
                 String[] splitMsg = msg.split(" ", 4);
                 switch (splitMsg[0]) {
                     case "PRIVATE": {
-                        String recipient = splitMsg[1].trim(); // El segundo elemento es el destinatario
+                        String recipient = splitMsg[1]; // El segundo elemento es el destinatario
 
-                        String content = splitMsg[2].trim(); // El tercer elemento es el contenido del mensaje
+                        String content = splitMsg[2]; // El tercer elemento es el contenido del mensaje
 
                         if (recipient.equals(username)) {
                             writer.println("Error: No puedes enviarte mensajes privados a ti mismo.");
@@ -45,9 +45,9 @@ public class ClientHandler implements Runnable {
                         break;
                     }
                     case "PRIVATE_VOICE": {
-                        String recipient = splitMsg[1].trim();  // Usuario destinatario
+                        String recipient = splitMsg[1]; // Usuario destinatario
 
-                        String voiceData = splitMsg[2].trim();  // Datos del mensaje de voz
+                        String voiceData = splitMsg[2]; // Datos del mensaje de voz
 
                         if (recipient.equals(username)) {
                             writer.println("Error: No puedes enviarte mensajes de voz a ti mismo.");
@@ -68,7 +68,7 @@ public class ClientHandler implements Runnable {
                     }
                     case "VOICE_ROOM": {
                         String[] voiceData = msg.split(" ", 4);
-                        String voiceByteData = voiceData[3];
+                        String voiceByteData = voiceData[2];
                         if (currentRoom != null) {
                             chatters.sendVoiceMessageToRoom(currentRoom, username, voiceByteData); // Enviar voz a sala
 
@@ -76,7 +76,7 @@ public class ClientHandler implements Runnable {
                         break;
                     }
                     case "CREATE_ROOM": {
-                        String roomName = splitMsg[1].trim();
+                        String roomName = splitMsg[1];
                         chatters.createRoom(roomName, username); // Crear y unirse automáticamente
 
                         currentRoom = roomName;
@@ -84,7 +84,7 @@ public class ClientHandler implements Runnable {
                         break;
                     }
                     case "JOIN_ROOM": {
-                        String roomName = splitMsg[1].trim();
+                        String roomName = splitMsg[1];
                         if (chatters.roomExists(roomName)) {
                             chatters.addUserToRoom(roomName, username);
                             currentRoom = roomName;
@@ -115,34 +115,39 @@ public class ClientHandler implements Runnable {
                         }
                         break;
                     case "CALL": {
-                        String recipient = splitMsg[1].trim();
+                        String recipient = splitMsg[1];
                         if (chatters.userExists(recipient)) {
-                            PrintWriter recipientWriter = chatters.getWriter(recipient);
-                            recipientWriter.println(username + " is calling you. Type ACCEPT or REJECT");
-                            String recipientResponse = reader.readLine();
-                            if ("ACCEPT".equals(recipientResponse)) {
-                                inCall = true;
-                                callRecipient = recipient;
-                                writer.println("ACCEPT");
-                                recipientWriter.println("Call Accepted. Starting voice chat.");
-                            } else if ("REJECT".equals(recipientResponse)) {
-                                writer.println("REJECT");
-                                recipientWriter.println("Call Rejected.");
-                            }
+                            chatters.callUser(username, recipient);
                         } else {
-                            writer.println("User did not respond.");
+                            writer.println("Error: User " + recipient + " not found.");
                         }
                         break;
                     }
-                    case "END_CALL":
+                    case "CALL_ACCEPTED": {
+                        String caller = splitMsg[1];
                         if (inCall) {
-                            PrintWriter recipientWriter = chatters.getWriter(callRecipient);
-                            recipientWriter.println("END_CALL");
-                            inCall = false;
-                            callRecipient = null;
-                            break label;
+                            writer.println("Error: You are already in a call.");
+                        } else {
+                            chatters.acceptCall(username, caller);
+                            inCall = true;
+                            callRecipient = caller;
                         }
                         break;
+                    }
+                    case "CALL_REJECTED": {
+                        String caller = splitMsg[1];
+                        chatters.rejectCall(username, caller);
+                        break;
+                    }
+                    case "CALL_AUDIO": {
+                        String audioData = splitMsg[2];
+                        if (inCall) {
+                            chatters.sendCallAudio(username, callRecipient, audioData);
+                        } else {
+                            writer.println("Error: You are not in a call.");
+                        }
+                        break;
+                    }
                     default:
                         // Si no es un mensaje privado, lo enviamos al grupo
                         chatters.broadCastMessage(username + ": " + msg);
